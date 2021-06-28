@@ -1,26 +1,16 @@
-let pxI = i => string_of_int(i) ++ "px";
-
-let pxF = v => pxI(int_of_float(v));
-
-module Key = {
-  let counter = ref(0);
-  let gen = () => {
-    incr(counter);
-    string_of_int(counter^);
-  };
-};
-
+// module SpringAnimation = HooksSpringAnimation
+// module RemoteAction = HooksRemoteAction
 module ImageTransition: {
   /***
    * Render function for a transition between two images.
    * phase is a value between 0.0 (first image) and 1.0 (second image).
    **/
-  let render: (~phase: float, int, int) => ReasonReact.reactElement;
+  let render: (~phase: float, int, int) => React.element;
   let displayHeight: int;
 } = {
   let numImages = 6;
   let displayHeight = 200;
-  let displayHeightString = pxI(displayHeight);
+  let displayHeightString = Px.i(displayHeight);
   let sizes = [|
     (500, 350),
     (800, 600),
@@ -42,15 +32,23 @@ module ImageTransition: {
     let width = width1 *. (1. -. phase) +. width2 *. phase;
     let left1 = -. (width1 *. phase);
     let left2 = left1 +. width1;
-    (pxF(width), pxF(left1), pxF(left2));
+    (Px.f(width), Px.f(left1), Px.f(left2));
   };
-  let renderImage = (~left, i) =>
+
+  let renderImage = (~left, i) => {
+    let src = {
+      "./" ++ string_of_int((i + numImages) mod numImages) ++ ".jpg";
+    };
+    Js.log("src: " ++ src);
     <img
       className="photo-inner"
       style={ReactDOMRe.Style.make(~height=displayHeightString, ~left, ())}
       src={"./" ++ string_of_int((i + numImages) mod numImages) ++ ".jpg"}
     />;
+  };
   let render = (~phase, image1, image2) => {
+    Js.log("ImageRender called");
+    Js.log4("ImageRender args: ", phase, image1, image2);
     let width1 = getWidth(image1);
     let width2 = getWidth(image2);
     let (width, left1, left2) = interpolate(~width1, ~width2, phase);
@@ -70,58 +68,81 @@ module ImageGalleryAnimation = {
     | Click
     | SetCursor(float);
   type state = {
-    animation: SpringAnimation.t,
+    animation: HooksSpringAnimation.t,
     /* cursor value 3.5 means half way between image 3 and image 4 */
     cursor: float,
     targetImage: int,
   };
-  let component = ReasonReact.reducerComponent("ImagesExample");
-  let make = (~initialImage=0, ~animateMount=true, _children) => {
-    ...component,
-    initialState: () => {
-      animation: SpringAnimation.create(float_of_int(initialImage)),
-      cursor: float_of_int(initialImage),
-      targetImage: initialImage,
-    },
-    didMount: ({state: {animation}, send}) => {
+  [@react.component]
+  let make = (~initialImage=0, ~animateMount=true) => {
+    // let initialState = {
+    //   animation: HooksSpringAnimation.create(float_of_int(initialImage)),
+    //   cursor: float_of_int(initialImage),
+    //   targetImage: initialImage,
+    // };
+    let handleClick = (~animation, ~targetImage) => {
+      Js.log("HandleClick called");
       animation
-      |> SpringAnimation.setOnChange(~precision=0.05, ~onChange=cursor =>
-           send(SetCursor(cursor))
-         );
-      if (animateMount) {
-        send(Click);
-      };
-    },
-    willUnmount: ({state: {animation}}) => SpringAnimation.stop(animation),
-    reducer: (action, state) =>
-      switch (action) {
-      | Click =>
-        UpdateWithSideEffects(
-          {...state, targetImage: state.targetImage + 1},
-          (
-            ({state: {animation, targetImage}}) =>
-              animation
-              |> SpringAnimation.setFinalValue(float_of_int(targetImage))
-          ),
-        )
-      | SetCursor(cursor) => Update({...state, cursor})
+      |> HooksSpringAnimation.setFinalValue(float_of_int(targetImage));
+    };
+    let (state, dispatch) =
+      React.useReducer(
+        (state, action) =>
+          switch (action) {
+          | Click =>
+            let state = {...state, targetImage: state.targetImage + 1};
+            let _ =
+              handleClick(
+                ~animation=state.animation,
+                ~targetImage=state.targetImage,
+              );
+            // let animation= {let x =HooksSpringAnimation.setFinalValue(float_of_int(state.targetImage));
+            // x};
+            // {...state,animation}
+            state;
+          | SetCursor(cursor) => {...state, cursor}
+          },
+        {
+          animation: HooksSpringAnimation.create(float_of_int(initialImage)),
+          cursor: float_of_int(initialImage),
+          targetImage: initialImage,
+        },
+      );
+    // let handleClick = () => {
+    //   Js.log("HandleClick called");
+    //   state.animation
+    //   |> HooksSpringAnimation.setFinalValue(float_of_int(state.targetImage));
+
+    //   dispatch(Click);
+    // };
+    React.useEffect0(
+      () => {
+        state.animation
+        |> HooksSpringAnimation.setOnChange(~precision=0.05, ~onChange=cursor =>
+             dispatch(SetCursor(cursor))
+           );
+        if (animateMount) {
+          // handleClick();
+          dispatch(Click);
+        };
+        Some(() => HooksSpringAnimation.stop(state.animation));
       },
-    render: ({state: {cursor}, send}) => {
-      let image = int_of_float(cursor);
-      let phase = cursor -. float_of_int(image);
-      <div onClick={_e => send(Click)}>
-        {ImageTransition.render(~phase, image, image + 1)}
-      </div>;
-    },
+      // [|state|],
+    );
+
+    let image = int_of_float(state.cursor);
+    let phase = state.cursor -. float_of_int(image);
+    <div onClick={_e => dispatch(Click)}>
+      {ImageTransition.render(~phase, image, image + 1)}
+    </div>;
   };
 };
 
 module AnimatedButton = {
   module Text = {
-    let component = ReasonReact.statelessComponent("Text");
-    let make = (~text, _children) => {
-      ...component,
-      render: _ => <button> {ReasonReact.string(text)} </button>,
+    [@react.component]
+    let make = (~text) => {
+      <button> {React.string(text)} </button>;
     };
   };
   type size =
@@ -132,7 +153,7 @@ module AnimatedButton = {
   let smallWidth = 250.;
   let largeWidth = 450.;
   type state = {
-    animation: SpringAnimation.t,
+    animation: HooksSpringAnimation.t,
     width: int,
     size,
     clickCount: int,
@@ -148,157 +169,165 @@ module AnimatedButton = {
     | ToggleSize
     /* Close the button by animating the width to shrink. */
     | Close;
-  let component = ReasonReact.reducerComponent("ButtonAnimation");
-  let make =
-      (~text="Button", ~rAction, ~animateMount=true, ~onClose=?, _children) => {
-    ...component,
-    initialState: () => {
-      animation: SpringAnimation.create(smallWidth),
+  [@react.component]
+  let make = (~text="Button", ~rAction, ~animateMount=true, ~onClose=?) => {
+    let initialState = {
+      animation: HooksSpringAnimation.create(smallWidth),
       width: int_of_float(smallWidth),
       size: Small,
       clickCount: 0,
       actionCount: 0,
-    },
-    didMount: ({send}) => {
-      RemoteAction.subscribe(~send, rAction) |> ignore;
-      if (animateMount) {
-        send(ToggleSize);
-      };
-    },
-    willUnmount: ({state: {animation}}) => SpringAnimation.stop(animation),
-    reducer: (action, state) =>
-      switch (action) {
-      | Click =>
-        UpdateWithSideEffects(
-          {
-            ...state,
-            clickCount: state.clickCount + 1,
-            actionCount: state.actionCount + 1,
+    };
+    let (state, dispatch) =
+      React.useReducer(
+        (state, action) =>
+          switch (action) {
+          | Click => {
+              ...state,
+              clickCount: state.clickCount + 1,
+              actionCount: state.actionCount + 1,
+            }
+          | Reset => {
+              ...state,
+              clickCount: 0,
+              actionCount: state.actionCount + 1,
+            }
+          | Unclick => {
+              ...state,
+              clickCount: state.clickCount - 1,
+              actionCount: state.actionCount + 1,
+            }
+          | Width(width) => {...state, width}
+          | ToggleSize => {
+              ...state,
+              size: state.size == Small ? Large : Small,
+            }
+          | Close => initialState
           },
-          (({send}) => send(ToggleSize)),
-        )
-      | Reset =>
-        Update({...state, clickCount: 0, actionCount: state.actionCount + 1})
-      | Unclick =>
-        Update({
-          ...state,
-          clickCount: state.clickCount - 1,
-          actionCount: state.actionCount + 1,
-        })
-      | Width(width) => Update({...state, width})
-      | ToggleSize =>
-        UpdateWithSideEffects(
-          {...state, size: state.size === Small ? Large : Small},
-          (
-            ({state: {animation, size}, send}) =>
-              animation
-              |> SpringAnimation.setOnChange(
-                   ~finalValue=size === Small ? smallWidth : largeWidth,
-                   ~precision=10.,
-                   ~onChange=w =>
-                   send(Width(int_of_float(w)))
-                 )
-          ),
-        )
-      | Close =>
-        SideEffects(
-          (
-            ({state: {animation}, send}) =>
-              animation
-              |> SpringAnimation.setOnChange(
-                   ~finalValue=closeWidth,
-                   ~speedup=0.3,
-                   ~precision=10.,
-                   ~onStop=onClose,
-                   ~onChange=w =>
-                   send(Width(int_of_float(w)))
-                 )
-          ),
-        )
+        initialState,
+      );
+    React.useEffect1(
+      () => {
+        HooksRemoteAction.subscribe(~send=dispatch, rAction) |> ignore;
+        if (animateMount) {
+          dispatch(ToggleSize);
+        };
+        Some(() => HooksSpringAnimation.stop(state.animation));
       },
-    render: ({state: {width} as state, send}) => {
-      let buttonLabel = state =>
-        text
-        ++ " clicks:"
-        ++ string_of_int(state.clickCount)
-        ++ " actions:"
-        ++ string_of_int(state.actionCount);
-      <div
-        className="exampleButton large"
-        onClick={_e => send(Click)}
-        style={ReactDOMRe.Style.make(~width=pxI(width), ())}>
-        <Text text={buttonLabel(state)} />
-      </div>;
-    },
+      [|state|],
+    );
+    React.useEffect1(
+      () => {
+        if (onClose->Belt.Option.isSome) {
+          state.animation
+          |> HooksSpringAnimation.setOnChange(
+               ~finalValue=closeWidth,
+               ~speedup=0.3,
+               ~precision=10.,
+               ~onStop=onClose,
+               ~onChange=w =>
+               dispatch(Width(int_of_float(w)))
+             );
+        };
+        Some(() => dispatch(Close));
+      },
+      [|state|],
+    );
+    let handleToggleSize = () => {
+      dispatch(ToggleSize);
+      state.animation
+      |> HooksSpringAnimation.setOnChange(
+           ~finalValue=state.size == Small ? smallWidth : largeWidth,
+           ~precision=10.,
+           ~onChange=w =>
+           dispatch(Width(int_of_float(w)))
+         );
+    };
+    let handleClick = () => {
+      dispatch(Click);
+      handleToggleSize();
+    };
+
+    let buttonLabel = state =>
+      text
+      ++ " clicks:"
+      ++ string_of_int(state.clickCount)
+      ++ " actions:"
+      ++ string_of_int(state.actionCount);
+    <div
+      className="exampleButton large"
+      onClick={_e => handleClick()}
+      style={ReactDOMRe.Style.make(~width=Px.i(state.width), ())}>
+      <Text text={buttonLabel(state)} />
+    </div>;
   };
 };
 
-module AnimateHeight = {
-  /* When the closing animation begins */
-  type onBeginClosing = Animation.onStop;
-  type action =
-    | Open(Animation.onStop)
-    | BeginClosing(onBeginClosing, Animation.onStop)
-    | Close(Animation.onStop)
-    | Animate(float, Animation.onStop)
-    | Height(float);
-  type state = {
-    height: float,
-    animation: SpringAnimation.t,
-  };
-  let component = ReasonReact.reducerComponent("HeightAnim");
-  let make = (~rAction, ~targetHeight, children) => {
-    ...component,
-    initialState: () => {height: 0., animation: SpringAnimation.create(0.)},
-    didMount: ({send}) => {
-      RemoteAction.subscribe(~send, rAction) |> ignore;
-      send(Animate(targetHeight, None));
-    },
-    reducer: (action, state) =>
-      switch (action) {
-      | Height(v) => Update({...state, height: v})
-      | Animate(finalValue, onStop) =>
-        SideEffects(
-          (
-            ({send}) =>
-              state.animation
-              |> SpringAnimation.setOnChange(
-                   ~finalValue, ~precision=10., ~onStop, ~onChange=h =>
-                   send(Height(h))
-                 )
-          ),
-        )
-      | Close(onClose) =>
-        SideEffects((({send}) => send(Animate(0., onClose))))
-      | BeginClosing(onBeginClosing, onClose) =>
-        SideEffects(
-          (
-            ({send}) => {
-              switch (onBeginClosing) {
-              | None => ()
-              | Some(f) => f()
-              };
-              send(Animate(0., onClose));
-            }
-          ),
-        )
-      | Open(onOpen) =>
-        SideEffects((({send}) => send(Animate(targetHeight, onOpen))))
-      },
-    willUnmount: ({state}) => SpringAnimation.stop(state.animation),
-    render: ({state}) =>
-      <div
-        style={
-          ReactDOMRe.Style.make(
-            ~height=pxF(state.height),
-            ~overflow="hidden",
-            (),
-          )
-        }>
-        {ReasonReact.array(children)}
-      </div>,
-  };
-};
+// module AnimateHeight = {
+//   /* When the closing animation begins */
+//   type onBeginClosing = HooksAnimation.onStop;
+//   type action =
+//     | Open(HooksAnimation.onStop)
+//     | BeginClosing(onBeginClosing, HooksAnimation.onStop)
+//     | Close(HooksAnimation.onStop)
+//     | Animate(float, HooksAnimation.onStop)
+//     | Height(float);
+//   type state = {
+//     height: float,
+//     animation: HooksSpringAnimation.t,
+//   };
+//   [@react.component]
+//   let make = (~rAction, ~targetHeight, ~children) => {
+
+//     let initialState = {height: 0., animation: HooksSpringAnimation.create(0.)};
+//     React.useEffect0(() => {
+//       HooksRemoteAction.subscribe(~send, rAction) |> ignore;
+//       send(Animate(targetHeight, None));
+//     };
+//     let (state, dispatch) = React.useReducer(state,action) =>
+//       switch (action) {
+//       | Height(v) => {...state, height: v})
+//       | Animate(finalValue, onStop) =>
+//         SideEffects(
+//           (
+//             ({send}) =>
+//               state.animation
+//               |> HooksSpringAnimation.setOnChange(
+//                    ~finalValue, ~precision=10., ~onStop, ~onChange=h =>
+//                    send(Height(h))
+//                  )
+//           ),
+//         )
+//       | Close(onClose) =>
+//         SideEffects((({send}) => send(Animate(0., onClose))))
+//       | BeginClosing(onBeginClosing, onClose) =>
+//         SideEffects(
+//           (
+//             ({send}) => {
+//               switch (onBeginClosing) {
+//               | None => ()
+//               | Some(f) => f()
+//               };
+//               send(Animate(0., onClose));
+//             }
+//           ),
+//         )
+//       | Open(onOpen) =>
+//         SideEffects((({send}) => send(Animate(targetHeight, onOpen))))
+//       },
+//     willUnmount: ({state}) => HooksSpringAnimation.stop(state.animation);
+//       <div
+//         style={
+//           ReactDOMRe.Style.make(
+//             ~height=Px.f(state.height),
+//             ~overflow="hidden",
+//             (),
+//           )
+//         }>
+//         {React.array(children)}
+//       </div>
+//   };
+// };
 
 module ReducerAnimationExample = {
   type action =
@@ -309,63 +338,63 @@ module ReducerAnimationExample = {
     | AddImage(bool)
     | DecrementAllButtons
     /* Remove from the list the button uniquely identified by its height RemoteAction */
-    | FilterOutItem(RemoteAction.t(AnimateHeight.action))
+    | FilterOutItem(HooksRemoteAction.t(AnimateHeight.action))
     | IncrementAllButtons
     | CloseAllButtons
     | RemoveItem
     | ResetAllButtons
     | ReverseItemsAnimation
-    | CloseHeight(Animation.onStop) /* Used by ReverseAnim */
+    | CloseHeight(HooksAnimation.onStop) /* Used by ReverseAnim */
     | ReverseWithSideEffects(unit => unit) /* Used by ReverseAnim */
-    | OpenHeight(Animation.onStop) /* Used by ReverseAnim */
+    | OpenHeight(HooksAnimation.onStop) /* Used by ReverseAnim */
     | ToggleRandomAnimation;
   type item = {
-    element: ReasonReact.reactElement,
-    rActionButton: RemoteAction.t(AnimatedButton.action),
-    rActionHeight: RemoteAction.t(AnimateHeight.action),
+    element: React.element,
+    rActionButton: HooksRemoteAction.t(AnimatedButton.action),
+    rActionHeight: HooksRemoteAction.t(AnimateHeight.action),
     /* used while removing items, to find the first item not already closing */
     mutable closing: bool,
   };
   module State: {
     type t = {
       act: action => unit,
-      randomAnimation: Animation.t,
+      randomAnimation: HooksAnimation.t,
       items: list(item),
     };
     let createButton:
       (
-        ~removeFromList: RemoteAction.t(AnimateHeight.action) => unit,
+        ~removeFromList: HooksRemoteAction.t(AnimateHeight.action) => unit,
         ~animateMount: bool=?,
         int
       ) =>
       item;
     let createImage: (~animateMount: bool=?, int) => item;
-    let getElements: t => array(ReasonReact.reactElement);
+    let getElements: t => array(React.element);
     let initial: unit => t;
   } = {
     type t = {
       act: action => unit,
-      randomAnimation: Animation.t,
+      randomAnimation: HooksAnimation.t,
       items: list(item),
     };
     let initial = () => {
       act: _action => (),
-      randomAnimation: Animation.create(),
+      randomAnimation: HooksAnimation.create(),
       items: [],
     };
     let getElements = ({items}) =>
       Belt.List.toArray(Belt.List.mapReverse(items, x => x.element));
     let createButton = (~removeFromList, ~animateMount=?, number) => {
-      let rActionButton = RemoteAction.create();
-      let rActionHeight = RemoteAction.create();
+      let rActionButton = HooksRemoteAction.create();
+      let rActionHeight = HooksRemoteAction.create();
       let key = Key.gen();
       let onClose = () =>
-        RemoteAction.send(
+        HooksRemoteAction.send(
           rActionHeight,
           ~action=
             AnimateHeight.Close(Some(() => removeFromList(rActionHeight))),
         );
-      let element: ReasonReact.reactElement =
+      let element: React.element =
         <AnimateHeight
           key rAction=rActionHeight targetHeight=AnimatedButton.targetHeight>
           <AnimatedButton
@@ -380,14 +409,14 @@ module ReducerAnimationExample = {
     };
     let createImage = (~animateMount=?, number) => {
       let key = Key.gen();
-      let rActionButton = RemoteAction.create();
+      let rActionButton = HooksRemoteAction.create();
       let imageGalleryAnimation =
         <ImageGalleryAnimation
           key={Key.gen()}
           initialImage=number
           ?animateMount
         />;
-      let rActionHeight = RemoteAction.create();
+      let rActionHeight = HooksRemoteAction.create();
       let element =
         <AnimateHeight
           key
@@ -398,18 +427,185 @@ module ReducerAnimationExample = {
       {element, rActionButton, rActionHeight, closing: false};
     };
   };
-  let runAll = action => {
-    let performSideEffects = ({ReasonReact.state: {State.items}}) =>
-      Belt.List.forEach(items, ({rActionButton}) =>
-        RemoteAction.send(rActionButton, ~action)
+  // let runAll = action => {
+  //   let performSideEffects = ({ReasonReact.state: {State.items}}) =>
+  //     Belt.List.forEach(items, ({rActionButton}) =>
+  //       HooksRemoteAction.send(rActionButton, ~action)
+  //     );
+  //   ReasonReact.SideEffects(performSideEffects);
+  // };
+  let runAll = (action, state: State.t) => {
+    let performSideEffects = () =>
+      Belt.List.forEach(state.items, ({rActionButton}) =>
+        HooksRemoteAction.send(rActionButton, ~action)
       );
-    ReasonReact.SideEffects(performSideEffects);
+    performSideEffects();
+    // state;
   };
-  let component = ReasonReact.reducerComponent("ReducerAnimationExample");
-  let rec make = (~showAllButtons, _children) => {
-    ...component,
-    initialState: () => State.initial(),
-    didMount: ({state: {State.randomAnimation: animation}, send}) => {
+  [@react.component]
+  let rec make = (~showAllButtons) => {
+    let self = (~key) =>
+      React.createElement(make, makeProps(~key, ~showAllButtons, ()));
+    let (state, dispatch) =
+      React.useReducer(
+        (state: State.t, action) =>
+          switch (action) {
+          | SetAct(act) => {...state, act}
+          | AddSelf =>
+            // module Self = {
+            //   let make = make(~showAllButtons);
+            // };
+            let key = Key.gen();
+            let rActionButton = HooksRemoteAction.create();
+            let rActionHeight = HooksRemoteAction.create();
+            let element =
+              <AnimateHeight key rAction=rActionHeight targetHeight=500.>
+                {self(~key)}
+              </AnimateHeight>;
+            let item = {
+              element,
+              rActionButton,
+              rActionHeight,
+              closing: false,
+            };
+            {...state, items: [item, ...state.items]};
+          | AddButton(animateMount) =>
+            let removeFromList = rActionHeight =>
+              state.act(FilterOutItem(rActionHeight));
+            {
+              ...state,
+              items: [
+                State.createButton(
+                  ~removeFromList,
+                  ~animateMount,
+                  Belt.List.length(state.items),
+                ),
+                ...state.items,
+              ],
+            };
+          | AddButtonFirst(animateMount) =>
+            let removeFromList = rActionHeight =>
+              state.act(FilterOutItem(rActionHeight));
+            {
+              ...state,
+              items:
+                state.items
+                @ [
+                  State.createButton(
+                    ~removeFromList,
+                    ~animateMount,
+                    Belt.List.length(state.items),
+                  ),
+                ],
+            };
+          | AddImage(animateMount) => {
+              ...state,
+              items: [
+                State.createImage(
+                  ~animateMount,
+                  Belt.List.length(state.items),
+                ),
+                ...state.items,
+              ],
+            }
+          | FilterOutItem(rAction) =>
+            let filter = item => item.rActionHeight !== rAction;
+            {...state, items: Belt.List.keep(state.items, filter)};
+          | DecrementAllButtons =>
+            runAll(Unclick, state);
+            state;
+          | IncrementAllButtons =>
+            runAll(Click, state);
+            state;
+          | CloseAllButtons =>
+            runAll(Close, state);
+            state;
+          | RemoveItem =>
+            switch (
+              Belt.List.getBy(state.items, item => item.closing == false)
+            ) {
+            | Some(firstItemNotClosing) =>
+              let onBeginClosing =
+                Some(() => firstItemNotClosing.closing = true);
+              let onClose =
+                Some(
+                  () =>
+                    state.act(
+                      FilterOutItem(firstItemNotClosing.rActionHeight),
+                    ),
+                );
+              HooksRemoteAction.send(
+                firstItemNotClosing.rActionHeight,
+                ~action=BeginClosing(onBeginClosing, onClose),
+              );
+              state;
+            | None => state
+            }
+          | ResetAllButtons =>
+            runAll(Reset, state);
+            state;
+          | CloseHeight(onStop) =>
+            let len = Belt.List.length(state.items);
+            let count = ref(len);
+            let onClose = () => {
+              decr(count);
+              if (count^ == 0) {
+                switch (onStop) {
+                | None => ()
+                | Some(f) => f()
+                };
+              };
+            };
+            let iter = _ =>
+              Belt.List.forEach(state.items, item =>
+                HooksRemoteAction.send(
+                  item.rActionHeight,
+                  ~action=Close(Some(onClose)),
+                )
+              );
+            iter();
+            state;
+          | OpenHeight(onStop) =>
+            let len = Belt.List.length(state.items);
+            let count = ref(len);
+            let onClose = () => {
+              decr(count);
+              if (count^ == 0) {
+                switch (onStop) {
+                | None => ()
+                | Some(f) => f()
+                };
+              };
+            };
+            let iter = _ =>
+              Belt.List.forEach(state.items, item =>
+                HooksRemoteAction.send(
+                  item.rActionHeight,
+                  ~action=Open(Some(onClose)),
+                )
+              );
+            iter();
+            state;
+          | ReverseWithSideEffects(performSideEffects) =>
+            {...state, items: Belt.List.reverse(state.items)} |> ignore;
+            performSideEffects();
+            state;
+          | ReverseItemsAnimation =>
+            let onStopClose = () =>
+              state.act(
+                ReverseWithSideEffects(() => state.act(OpenHeight(None))),
+              );
+            state.act(CloseHeight(Some(onStopClose)));
+            state;
+          | ToggleRandomAnimation =>
+            HooksAnimation.isActive(state.randomAnimation)
+              ? HooksAnimation.stop(state.randomAnimation)
+              : HooksAnimation.start(state.randomAnimation);
+            state;
+          },
+        State.initial(),
+      );
+    React.useEffect0(() => {
       let callback =
         (.) => {
           let randomAction =
@@ -422,221 +618,71 @@ module ReducerAnimationExample = {
             | 5 => IncrementAllButtons
             | _ => assert(false)
             };
-          send(randomAction);
-          Animation.Continue;
+          dispatch(randomAction);
+          HooksAnimation.Continue;
         };
-      send(SetAct(send));
-      Animation.setCallback(animation, ~callback);
-    },
-    willUnmount: ({state: {randomAnimation}}) =>
-      Animation.stop(randomAnimation),
-    reducer: (action, {act, items, randomAnimation} as state) =>
-      switch (action) {
-      | SetAct(act) => Update({...state, act})
-      | AddSelf =>
-        module Self = {
-          let make = make(~showAllButtons);
-        };
-        let key = Key.gen();
-        let rActionButton = RemoteAction.create();
-        let rActionHeight = RemoteAction.create();
-        let element =
-          <AnimateHeight key rAction=rActionHeight targetHeight=500.>
-            <Self key />
-          </AnimateHeight>;
-        let item = {element, rActionButton, rActionHeight, closing: false};
-        Update({...state, items: [item, ...items]});
-      | AddButton(animateMount) =>
-        let removeFromList = rActionHeight =>
-          act(FilterOutItem(rActionHeight));
-        Update({
-          ...state,
-          items: [
-            State.createButton(
-              ~removeFromList,
-              ~animateMount,
-              Belt.List.length(items),
-            ),
-            ...items,
-          ],
-        });
-      | AddButtonFirst(animateMount) =>
-        let removeFromList = rActionHeight =>
-          act(FilterOutItem(rActionHeight));
-        Update({
-          ...state,
-          items:
-            items
-            @ [
-              State.createButton(
-                ~removeFromList,
-                ~animateMount,
-                Belt.List.length(items),
-              ),
-            ],
-        });
-      | AddImage(animateMount) =>
-        Update({
-          ...state,
-          items: [
-            State.createImage(~animateMount, Belt.List.length(items)),
-            ...items,
-          ],
-        })
-      | FilterOutItem(rAction) =>
-        let filter = item => item.rActionHeight !== rAction;
-        Update({...state, items: Belt.List.keep(items, filter)});
-      | DecrementAllButtons => runAll(Unclick)
-      | IncrementAllButtons => runAll(Click)
-      | CloseAllButtons => runAll(Close)
-      | RemoveItem =>
-        switch (Belt.List.getBy(items, item => item.closing === false)) {
-        | Some(firstItemNotClosing) =>
-          let onBeginClosing =
-            Some((() => firstItemNotClosing.closing = true));
-          let onClose =
-            Some(
-              (() => act(FilterOutItem(firstItemNotClosing.rActionHeight))),
-            );
-          SideEffects(
-            (
-              _ =>
-                RemoteAction.send(
-                  firstItemNotClosing.rActionHeight,
-                  ~action=BeginClosing(onBeginClosing, onClose),
-                )
-            ),
-          );
-        | None => NoUpdate
-        }
-      | ResetAllButtons => runAll(Reset)
-      | CloseHeight(onStop) =>
-        let len = Belt.List.length(items);
-        let count = ref(len);
-        let onClose = () => {
-          decr(count);
-          if (count^ === 0) {
-            switch (onStop) {
-            | None => ()
-            | Some(f) => f()
-            };
-          };
-        };
-        let iter = _ =>
-          Belt.List.forEach(items, item =>
-            RemoteAction.send(
-              item.rActionHeight,
-              ~action=Close(Some(onClose)),
-            )
-          );
-        SideEffects(iter);
-      | OpenHeight(onStop) =>
-        let len = Belt.List.length(items);
-        let count = ref(len);
-        let onClose = () => {
-          decr(count);
-          if (count^ === 0) {
-            switch (onStop) {
-            | None => ()
-            | Some(f) => f()
-            };
-          };
-        };
-        let iter = _ =>
-          Belt.List.forEach(items, item =>
-            RemoteAction.send(
-              item.rActionHeight,
-              ~action=Open(Some(onClose)),
-            )
-          );
-        SideEffects(iter);
-      | ReverseWithSideEffects(performSideEffects) =>
-        UpdateWithSideEffects(
-          {...state, items: Belt.List.reverse(items)},
-          (_ => performSideEffects()),
-        )
-      | ReverseItemsAnimation =>
-        let onStopClose = () =>
-          act(ReverseWithSideEffects(() => act(OpenHeight(None))));
-        SideEffects((_ => act(CloseHeight(Some(onStopClose)))));
-      | ToggleRandomAnimation =>
-        SideEffects(
-          (
-            _ =>
-              Animation.isActive(randomAnimation) ?
-                Animation.stop(randomAnimation) :
-                Animation.start(randomAnimation)
-          ),
-        )
-      },
-    render: ({state}) => {
-      let button = (~repeat=1, ~hide=false, txt, action) =>
-        hide ?
-          ReasonReact.null :
-          <div
+      dispatch(SetAct(dispatch));
+      HooksAnimation.setCallback(state.randomAnimation, ~callback);
+      Some(() => HooksAnimation.stop(state.randomAnimation));
+    });
+
+    let button = (~repeat=1, ~hide=false, txt, action) =>
+      hide
+        ? ReasonReact.null
+        : <div
             className="exampleButton large"
             style={ReactDOMRe.Style.make(~width="220px", ())}
-            onClick={
-              _e =>
-                for (_ in 1 to repeat) {
-                  state.act(action);
-                }
+            onClick={_e =>
+              for (_ in 1 to repeat) {
+                state.act(action);
+              }
             }>
-            {ReasonReact.string(txt)}
+            {React.string(txt)}
           </div>;
-      let hide = !showAllButtons;
-      <div className="componentBox">
-        <div className="componentColumn">
-          {ReasonReact.string("Control:")}
-          {button("Add Button", AddButton(true))}
-          {button("Add Image", AddImage(true))}
-          {button("Add Button On Top", AddButtonFirst(true))}
-          {button("Remove Item", RemoveItem)}
-          {
-            button(
-              ~hide,
-              ~repeat=100,
-              "Add 100 Buttons On Top",
-              AddButtonFirst(false),
-            )
-          }
-          {button(~hide, ~repeat=100, "Add 100 Images", AddImage(false))}
-          {button("Click all the Buttons", IncrementAllButtons)}
-          {button(~hide, "Unclick all the Buttons", DecrementAllButtons)}
-          {button("Close all the Buttons", CloseAllButtons)}
-          {
-            button(
-              ~hide,
-              ~repeat=10,
-              "Click all the Buttons 10 times",
-              IncrementAllButtons,
-            )
-          }
-          {button(~hide, "Reset all the Buttons' states", ResetAllButtons)}
-          {button("Reverse Items", ReverseItemsAnimation)}
-          {
-            button(
-              "Random Animation "
-              ++ (Animation.isActive(state.randomAnimation) ? "ON" : "OFF"),
-              ToggleRandomAnimation,
-            )
-          }
-          {button("Add Self", AddSelf)}
+    let hide = !showAllButtons;
+    <div className="componentBox">
+      <div className="componentColumn">
+        {React.string("Control:")}
+        {button("Add Button", AddButton(true))}
+        {button("Add Image", AddImage(true))}
+        {button("Add Button On Top", AddButtonFirst(true))}
+        {button("Remove Item", RemoveItem)}
+        {button(
+           ~hide,
+           ~repeat=100,
+           "Add 100 Buttons On Top",
+           AddButtonFirst(false),
+         )}
+        {button(~hide, ~repeat=100, "Add 100 Images", AddImage(false))}
+        {button("Click all the Buttons", IncrementAllButtons)}
+        {button(~hide, "Unclick all the Buttons", DecrementAllButtons)}
+        {button("Close all the Buttons", CloseAllButtons)}
+        {button(
+           ~hide,
+           ~repeat=10,
+           "Click all the Buttons 10 times",
+           IncrementAllButtons,
+         )}
+        {button(~hide, "Reset all the Buttons' states", ResetAllButtons)}
+        {button("Reverse Items", ReverseItemsAnimation)}
+        {button(
+           "Random Animation "
+           ++ (HooksAnimation.isActive(state.randomAnimation) ? "ON" : "OFF"),
+           ToggleRandomAnimation,
+         )}
+        {button("Add Self", AddSelf)}
+      </div>
+      <div
+        className="componentColumn"
+        style={ReactDOMRe.Style.make(~width="500px", ())}>
+        <div>
+          {React.string(
+             "Items:" ++ string_of_int(Belt.List.length(state.items)),
+           )}
         </div>
-        <div
-          className="componentColumn"
-          style={ReactDOMRe.Style.make(~width="500px", ())}>
-          <div>
-            {
-              ReasonReact.string(
-                "Items:" ++ string_of_int(Belt.List.length(state.items)),
-              )
-            }
-          </div>
-          {ReasonReact.array(State.getElements(state))}
-        </div>
-      </div>;
-    },
+        {React.array(State.getElements(state))}
+      </div>
+    </div>;
   };
 };
 
@@ -648,44 +694,44 @@ module ChatHead = {
     x: float,
     y: float,
   };
-  let component = ReasonReact.reducerComponent("ChatHead");
-  let make = (~rAction, ~headNum, ~imageGallery, _children) => {
-    ...component,
-    initialState: () => {x: 0., y: 0.},
-    didMount: ({send}) => RemoteAction.subscribe(~send, rAction) |> ignore,
-    reducer: (action, state: state) =>
-      switch (action) {
-      | MoveX(x) => Update({...state, x})
-      | MoveY(y) => Update({...state, y})
-      },
-    render: ({state: {x, y}}) => {
-      let left = pxF(x -. 25.);
-      let top = pxF(y -. 25.);
-      imageGallery ?
-        <div
+  [@react.component]
+  let make = (~rAction, ~headNum, ~imageGallery) => {
+    let (state, dispatch) =
+      React.useReducer(
+        (state: state, action) =>
+          switch (action) {
+          | MoveX(x) => {...state, x}
+          | MoveY(y) => {...state, y}
+          },
+        {x: 0., y: 0.},
+      );
+    React.useEffect0(() => {
+      HooksRemoteAction.subscribe(~send=dispatch, rAction) |> ignore;
+      None;
+    });
+
+    let left = Px.f(state.x -. 25.);
+    let top = Px.f(state.y -. 25.);
+    imageGallery
+      ? <div
           className="chat-head-image-gallery"
-          style={
-            ReactDOMRe.Style.make(
-              ~left,
-              ~top,
-              ~zIndex=string_of_int(- headNum),
-              (),
-            )
-          }>
+          style={ReactDOMRe.Style.make(
+            ~left,
+            ~top,
+            ~zIndex=string_of_int(- headNum),
+            (),
+          )}>
           <ImageGalleryAnimation initialImage=headNum />
-        </div> :
-        <div
+        </div>
+      : <div
           className={"chat-head chat-head-" ++ string_of_int(headNum mod 6)}
-          style={
-            ReactDOMRe.Style.make(
-              ~left,
-              ~top,
-              ~zIndex=string_of_int(- headNum),
-              (),
-            )
-          }
+          style={ReactDOMRe.Style.make(
+            ~left,
+            ~top,
+            ~zIndex=string_of_int(- headNum),
+            (),
+          )}
         />;
-    },
   };
 };
 
@@ -695,23 +741,23 @@ module ChatHeadsExample = {
     "window.addEventListener";
   let numHeads = 6;
   type control = {
-    rAction: RemoteAction.t(ChatHead.action),
-    animX: SpringAnimation.t,
-    animY: SpringAnimation.t,
+    rAction: HooksRemoteAction.t(ChatHead.action),
+    animX: HooksSpringAnimation.t,
+    animY: HooksSpringAnimation.t,
   };
   type state = {
     controls: array(control),
-    chatHeads: array(ReasonReact.reactElement),
+    chatHeads: array(React.element),
   };
   let createControl = () => {
-    rAction: RemoteAction.create(),
-    animX: SpringAnimation.create(0.),
-    animY: SpringAnimation.create(0.),
+    rAction: HooksRemoteAction.create(),
+    animX: HooksSpringAnimation.create(0.),
+    animY: HooksSpringAnimation.create(0.),
   };
 
   [@react.component]
-  let make = (~imageGallery, _) => {
-    let ({chatHeads, controls}, _send) =
+  let make = (~imageGallery) => {
+    let ({chatHeads, controls}, _) =
       React.useReducer(
         (state, _action) => state,
         {
@@ -736,11 +782,11 @@ module ChatHeadsExample = {
           let control = controls[headNum];
           let animation = isX ? control.animX : control.animY;
           animation
-          |> SpringAnimation.setOnChange(
-               ~preset=Spring.gentle,
+          |> HooksSpringAnimation.setOnChange(
+               ~preset=HooksSpring.gentle,
                ~speedup=2.,
                ~onChange=v => {
-                 RemoteAction.send(
+                 HooksRemoteAction.send(
                    control.rAction,
                    ~action=isX ? MoveX(v) : MoveY(v),
                  );
@@ -750,13 +796,15 @@ module ChatHeadsExample = {
         };
         let isLastHead = headNum == numHeads - 1;
         let afterChangeX = x =>
-          isLastHead ?
-            () :
-            controls[headNum + 1].animX |> SpringAnimation.setFinalValue(x);
+          isLastHead
+            ? ()
+            : controls[headNum + 1].animX
+              |> HooksSpringAnimation.setFinalValue(x);
         let afterChangeY = y =>
-          isLastHead ?
-            () :
-            controls[headNum + 1].animY |> SpringAnimation.setFinalValue(y);
+          isLastHead
+            ? ()
+            : controls[headNum + 1].animY
+              |> HooksSpringAnimation.setFinalValue(y);
         setOnChange(~isX=true, afterChangeX);
         setOnChange(~isX=false, afterChangeY);
       };
@@ -764,8 +812,8 @@ module ChatHeadsExample = {
       let onMove = e => {
         let x = e##pageX;
         let y = e##pageY;
-        controls[0].animX |> SpringAnimation.setFinalValue(x);
-        controls[0].animY |> SpringAnimation.setFinalValue(y);
+        controls[0].animX |> HooksSpringAnimation.setFinalValue(x);
+        controls[0].animY |> HooksSpringAnimation.setFinalValue(y);
       };
       addEventListener("mousemove", onMove);
       addEventListener("touchmove", onMove);
@@ -775,14 +823,14 @@ module ChatHeadsExample = {
           Belt.Array.forEach(
             controls,
             ({animX, animY}) => {
-              SpringAnimation.stop(animX);
-              SpringAnimation.stop(animY);
+              HooksSpringAnimation.stop(animX);
+              HooksSpringAnimation.stop(animY);
             },
           ),
       );
     });
 
-    <div> {ReasonReact.array(chatHeads)} </div>;
+    <div> {React.array(chatHeads)} </div>;
   };
 };
 
@@ -791,42 +839,47 @@ module ChatHeadsExampleStarter = {
     | StartMessage
     | ChatHeads
     | ImageGalleryHeads;
-  let component = ReasonReact.reducerComponent("ChatHeadsExampleStarter");
-  let make = _children => {
-    ...component,
-    initialState: () => StartMessage,
-    reducer: (actionIsState, _) => Update(actionIsState),
-    render: ({state, send}) =>
-      switch (state) {
-      | StartMessage =>
+  [@react.component]
+  let make = () => {
+    let (state, dispatch) = React.useState(() => StartMessage);
+    switch (state) {
+    | StartMessage =>
+      Js.log("StartMessage clicked");
+      <div>
         <div>
-          <div>
-            <button onClick=(_e => send(ChatHeads))>
-              {ReasonReact.string("Start normal chatheads")}
-            </button>
-          </div>
-          <button onClick=(_e => send(ImageGalleryHeads))>
-            {ReasonReact.string("Start image gallery chatheads")}
+          <button onClick={_e => dispatch(_ => ChatHeads)}>
+            {React.string("Start normal chatheads")}
           </button>
         </div>
-      | ChatHeads =>
-        React.createElement(
-          ChatHeadsExample.make,
-          ChatHeadsExample.makeProps(~imageGallery=false, ()),
-        )
-      | ImageGalleryHeads =>
-        React.createElement(
-          ChatHeadsExample.make,
-          ChatHeadsExample.makeProps(~imageGallery=true, ()),
-        )
-      },
+        <button onClick={_e => dispatch(_ => ImageGalleryHeads)}>
+          {React.string("Start image gallery chatheads")}
+        </button>
+      </div>;
+    | ChatHeads =>
+      Js.log("ChatHeadsExample clicked");
+      <ChatHeadsExample imageGallery=false />;
+
+    | ImageGalleryHeads =>
+      Js.log("ImageGalleryHeads clicked");
+      <ChatHeadsExample imageGallery=true />;
+    // | ChatHeads =>
+    //   React.createElement(
+    //     ChatHeadsExample.make,
+    //     ChatHeadsExample.makeProps(~imageGallery=false, ()),
+    //   )
+    // | ImageGalleryHeads =>
+    //   React.createElement(
+    //     ChatHeadsExample.make,
+    //     ChatHeadsExample.makeProps(~imageGallery=true, ()),
+    //   )
+    };
   };
 };
 
 module GalleryItem = {
-  let component = ReasonReact.statelessComponent("GalleryItem");
-  let make = (~title="Untitled", ~description="no description", child) => {
-    let title = <div className="header"> {ReasonReact.string(title)} </div>;
+  [@react.component]
+  let make = (~title="Untitled", ~description="no description", ~children) => {
+    let title = <div className="header"> {React.string(title)} </div>;
     let description =
       <div
         className="headerSubtext"
@@ -834,18 +887,14 @@ module GalleryItem = {
       />;
     let leftRight =
       <div className="galleryItemDemo leftRightContainer">
-        <div className="right interactionContainer"> child </div>
+        <div className="right interactionContainer"> children </div>
       </div>;
-    {
-      ...component,
-      render: _self =>
-        <div className="galleryItem"> title description leftRight </div>,
-    };
+
+    <div className="galleryItem"> title description leftRight </div>;
   };
 };
 
 module GalleryContainer = {
-  let component = ReasonReact.statelessComponent("GalleryContainer");
   let megaHeaderTitle = "Animating With Reason React Reducers";
   let megaHeaderSubtext = {|
     Examples With Animations.
@@ -854,33 +903,30 @@ module GalleryContainer = {
     Explore animation with ReasonReact and reducers.
 
   |};
-  let make = children => {
-    ...component,
-    render: _self =>
-      <div
-        className="mainGallery"
-        style={ReactDOMRe.Style.make(~width="850px", ())}>
-        <div key="megaHeader" className="megaHeader">
-          {ReasonReact.string(megaHeaderTitle)}
-        </div>
-        <div key="degaHeaderSubtext" className="megaHeaderSubtext">
-          {ReasonReact.string(megaHeaderSubtext)}
-        </div>
-        <div key="headerSubtext" className="megaHeaderSubtextDetails">
-          {ReasonReact.string(megaHeaderSubtextDetails)}
-        </div>
-        {
-          ReasonReact.array(
-            Array.map(c => <div key={Key.gen()}> c </div>, children),
-          )
-        }
-      </div>,
+  [@react.component]
+  let make = (~children) => {
+    <div
+      className="mainGallery"
+      style={ReactDOMRe.Style.make(~width="850px", ())}>
+      <div key="megaHeader" className="megaHeader">
+        {React.string(megaHeaderTitle)}
+      </div>
+      <div key="degaHeaderSubtext" className="megaHeaderSubtext">
+        {React.string(megaHeaderSubtext)}
+      </div>
+      <div key="headerSubtext" className="megaHeaderSubtextDetails">
+        {React.string(megaHeaderSubtextDetails)}
+      </div>
+      {React.array(
+         Belt.Array.map(children, c => <div key={Key.gen()}> c </div>),
+       )}
+    </div>;
   };
 };
-
+module Demo = HooksDemo;
 module ComponentGallery = {
-  let component = ReasonReact.statelessComponent("ComponentGallery");
-  let make = _children => {
+  [@react.component]
+  let make = () => {
     let globalStateExample =
       <GalleryItem title="Global State Example" description={||}>
         ...<Demo.GlobalStateExample />
@@ -917,7 +963,7 @@ module ComponentGallery = {
         ...<Demo.Parent />
       </GalleryItem>;
     let chatHeads =
-      <GalleryItem title="Chat Heads" description={||}>
+      <GalleryItem title="Chat Heads Example Starter" description={||}>
         ...<ChatHeadsExampleStarter />
       </GalleryItem>;
     let imageGallery =
@@ -930,21 +976,19 @@ module ComponentGallery = {
       <GalleryItem title="Animation Based On Reducers" description={||}>
         ...<ReducerAnimationExample showAllButtons=false />
       </GalleryItem>;
-    {
-      ...component,
-      render: _self =>
-        <GalleryContainer>
-          globalStateExample
-          localStateExample
-          simpleTextInput
-          simpleSpring
-          animatedTextInput
-          animatedTextInputRemote
-          callActionsOnGrandChild
-          chatHeads
-          imageGallery
-          reducerAnimation
-        </GalleryContainer>,
-    };
+    <GalleryContainer>
+      [|
+        globalStateExample,
+        localStateExample,
+        simpleTextInput,
+        simpleSpring,
+        animatedTextInput,
+        animatedTextInputRemote,
+        callActionsOnGrandChild,
+        chatHeads,
+        imageGallery,
+        reducerAnimation,
+      |]
+    </GalleryContainer>;
   };
 };

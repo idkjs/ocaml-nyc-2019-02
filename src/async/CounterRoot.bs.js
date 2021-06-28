@@ -1,9 +1,9 @@
 'use strict';
 
-var ReactDOMRe = require("reason-react/src/ReactDOMRe.js");
-var ReasonReact = require("reason-react/src/ReasonReact.js");
-var Counter$ReasonReactExample = require("./Counter.bs.js");
+var React = require("react");
+var ReactDOMRe = require("reason-react/src/legacy/ReactDOMRe.bs.js");
+var Counter$Reducers = require("./Counter.bs.js");
 
-ReactDOMRe.renderToElementWithId(ReasonReact.element(undefined, undefined, Counter$ReasonReactExample.make(/* array */[])), "index");
+ReactDOMRe.renderToElementWithId(React.createElement(Counter$Reducers.make, {}), "index");
 
 /*  Not a pure module */

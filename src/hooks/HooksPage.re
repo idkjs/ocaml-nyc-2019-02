@@ -11,6 +11,6 @@ let make = (~message, ()) => {
   React.useEffect(() => {
     Js.log("Hey!");
     None;
-  }); 
-  <button onClick=handleClick> {ReasonReact.string(message)} </button>
+  });
+  <button onClick=handleClick> {React.string(message)} </button>
 };

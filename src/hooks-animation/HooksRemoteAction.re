@@ -12,7 +12,7 @@ let create = () => {send: sendDefault};
  * a given RemoteAction has the ability to unsubscribe.
  */
 let subscribe = (~send, x) =>
-  if (x.send === sendDefault) {
+  if (x.send == sendDefault) {
     x.send = send;
     Some(x);
   } else {

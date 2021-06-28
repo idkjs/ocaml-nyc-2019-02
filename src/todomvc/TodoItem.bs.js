@@ -1,174 +1,128 @@
 'use strict';
 
-var Block = require("bs-platform/lib/js/block.js");
 var Curry = require("bs-platform/lib/js/curry.js");
 var React = require("react");
 var $$String = require("bs-platform/lib/js/string.js");
-var ReasonReact = require("reason-react/src/ReasonReact.js");
-var Js_primitive = require("bs-platform/lib/js/js_primitive.js");
 
-var component = ReasonReact.reducerComponent("TodoItemRe");
-
-function setEditFieldRef(r, param) {
-  param[/* state */1][/* editFieldRef */2][0] = (r == null) ? undefined : Js_primitive.some(r);
-  return /* () */0;
-}
-
-function make(todo, editing, onDestroy, onSave, onEdit, onToggle, onCancel, _) {
+function TodoItem(Props) {
+  var todo = Props.todo;
+  var editing = Props.editing;
+  var onDestroy = Props.onDestroy;
+  var onSave = Props.onSave;
+  var onEdit = Props.onEdit;
+  var onToggle = Props.onToggle;
+  var onCancel = Props.onCancel;
   var submitHelper = function (state) {
-    var nonEmptyValue = $$String.trim(state[/* editText */0]);
+    var nonEmptyValue = $$String.trim(state.editText);
     if (nonEmptyValue === "") {
-      return /* SideEffects */Block.__(1, [(function () {
-                    return Curry._1(onDestroy, /* () */0);
-                  })]);
-    } else {
-      return /* UpdateWithSideEffects */Block.__(2, [
-                /* record */[
-                  /* editText */nonEmptyValue,
-                  /* editing */state[/* editing */1],
-                  /* editFieldRef */state[/* editFieldRef */2]
-                ],
-                (function () {
-                    return Curry._1(onSave, nonEmptyValue);
-                  })
-              ]);
+      Curry._1(onDestroy, undefined);
+      return state;
     }
+    Curry._1(onSave, nonEmptyValue);
+    return {
+            editText: nonEmptyValue,
+            editing: state.editing,
+            editFieldRef: state.editFieldRef
+          };
   };
-  return /* record */[
-          /* debugName */component[/* debugName */0],
-          /* reactClassInternal */component[/* reactClassInternal */1],
-          /* handedOffState */component[/* handedOffState */2],
-          /* willReceiveProps */(function (param) {
-              var state = param[/* state */1];
-              return /* record */[
-                      /* editText */state[/* editText */0],
-                      /* editing */editing,
-                      /* editFieldRef */state[/* editFieldRef */2]
-                    ];
-            }),
-          /* didMount */component[/* didMount */4],
-          /* didUpdate */(function (param) {
-              var match = param[/* oldSelf */0][/* state */1][/* editing */1];
-              var match$1 = param[/* newSelf */1][/* state */1][/* editFieldRef */2][0];
-              if (match || !(editing && match$1 !== undefined)) {
-                return /* () */0;
-              } else {
-                var field = Js_primitive.valFromOption(match$1);
-                field.focus();
-                field.setSelectionRange(field.value.length, field.value.length);
-                return /* () */0;
-              }
-            }),
-          /* willUnmount */component[/* willUnmount */6],
-          /* willUpdate */component[/* willUpdate */7],
-          /* shouldUpdate */component[/* shouldUpdate */8],
-          /* render */(function (param) {
-              var send = param[/* send */3];
-              var match = todo[/* completed */2];
-              var className = $$String.concat(" ", /* :: */[
-                    match ? "completed" : "",
-                    /* :: */[
-                      editing ? "editing" : "",
-                      /* [] */0
-                    ]
-                  ]);
-              return React.createElement("li", {
-                          className: className
-                        }, React.createElement("div", {
-                              className: "view"
-                            }, React.createElement("input", {
-                                  className: "toggle",
-                                  checked: todo[/* completed */2],
-                                  type: "checkbox",
-                                  onChange: (function () {
-                                      return Curry._1(onToggle, /* () */0);
-                                    })
-                                }), React.createElement("label", {
-                                  onDoubleClick: (function () {
-                                      Curry._1(onEdit, /* () */0);
-                                      return Curry._1(send, /* Edit */0);
-                                    })
-                                }, todo[/* title */1]), React.createElement("button", {
-                                  className: "destroy",
-                                  onClick: (function () {
-                                      return Curry._1(onDestroy, /* () */0);
-                                    })
-                                })), React.createElement("input", {
-                              ref: Curry._1(param[/* handle */0], setEditFieldRef),
-                              className: "edit",
-                              value: param[/* state */1][/* editText */0],
-                              onKeyDown: (function ($$event) {
-                                  return Curry._1(send, /* KeyDown */Block.__(0, [$$event.which]));
-                                }),
-                              onBlur: (function () {
-                                  return Curry._1(send, /* Submit */1);
-                                }),
-                              onChange: (function ($$event) {
-                                  return Curry._1(send, /* Change */Block.__(1, [$$event.target.value]));
-                                })
-                            }));
-            }),
-          /* initialState */(function () {
-              return /* record */[
-                      /* editText */todo[/* title */1],
-                      /* editing */editing,
-                      /* editFieldRef : record */[/* contents */undefined]
-                    ];
-            }),
-          /* retainedProps */component[/* retainedProps */11],
-          /* reducer */(function (action) {
-              if (typeof action === "number") {
-                if (action === 0) {
-                  return (function (state) {
-                      return /* Update */Block.__(0, [/* record */[
-                                  /* editText */todo[/* title */1],
-                                  /* editing */state[/* editing */1],
-                                  /* editFieldRef */state[/* editFieldRef */2]
-                                ]]);
-                    });
-                } else {
-                  return submitHelper;
-                }
-              } else if (action.tag) {
-                var text = action[0];
-                return (function (state) {
-                    if (editing) {
-                      return /* Update */Block.__(0, [/* record */[
-                                  /* editText */text,
-                                  /* editing */state[/* editing */1],
-                                  /* editFieldRef */state[/* editFieldRef */2]
-                                ]]);
-                    } else {
-                      return /* NoUpdate */0;
-                    }
-                  });
-              } else {
-                var match = action[0];
-                if (match !== 13) {
-                  if (match !== 27) {
-                    return (function () {
-                        return /* NoUpdate */0;
-                      });
-                  } else {
-                    Curry._1(onCancel, /* () */0);
-                    return (function (state) {
-                        return /* Update */Block.__(0, [/* record */[
-                                    /* editText */todo[/* title */1],
-                                    /* editing */state[/* editing */1],
-                                    /* editFieldRef */state[/* editFieldRef */2]
-                                  ]]);
-                      });
-                  }
-                } else {
-                  return submitHelper;
-                }
-              }
-            }),
-          /* jsElementWrapped */component[/* jsElementWrapped */13]
-        ];
+  var match = React.useReducer((function (state, action) {
+          if (typeof action === "number") {
+            if (action === /* Edit */0) {
+              return {
+                      editText: todo.title,
+                      editing: state.editing,
+                      editFieldRef: state.editFieldRef
+                    };
+            } else {
+              return submitHelper(state);
+            }
+          }
+          if (action.TAG !== /* KeyDown */0) {
+            if (state.editing) {
+              return {
+                      editText: action._0,
+                      editing: state.editing,
+                      editFieldRef: state.editFieldRef
+                    };
+            } else {
+              return state;
+            }
+          }
+          var match = action._0;
+          if (match !== 13) {
+            if (match !== 27) {
+              return state;
+            } else {
+              Curry._1(onCancel, undefined);
+              return {
+                      editText: todo.title,
+                      editing: state.editing,
+                      editFieldRef: state.editFieldRef
+                    };
+            }
+          } else {
+            return submitHelper(state);
+          }
+        }), {
+        editText: todo.title,
+        editing: editing,
+        editFieldRef: {
+          contents: undefined
+        }
+      });
+  var dispatch = match[1];
+  var editFieldRef = React.useRef(null);
+  var className = $$String.concat(" ", {
+        hd: todo.completed ? "completed" : "",
+        tl: {
+          hd: editing ? "editing" : "",
+          tl: /* [] */0
+        }
+      });
+  return React.createElement("li", {
+              className: className
+            }, React.createElement("div", {
+                  className: "view"
+                }, React.createElement("input", {
+                      className: "toggle",
+                      checked: todo.completed,
+                      type: "checkbox",
+                      onChange: (function (param) {
+                          return Curry._1(onToggle, undefined);
+                        })
+                    }), React.createElement("label", {
+                      onDoubleClick: (function (_event) {
+                          Curry._1(onEdit, undefined);
+                          return Curry._1(dispatch, /* Edit */0);
+                        })
+                    }, todo.title), React.createElement("button", {
+                      className: "destroy",
+                      onClick: (function (param) {
+                          return Curry._1(onDestroy, undefined);
+                        })
+                    })), React.createElement("input", {
+                  ref: editFieldRef,
+                  className: "edit",
+                  value: match[0].editText,
+                  onKeyDown: (function ($$event) {
+                      return Curry._1(dispatch, {
+                                  TAG: /* KeyDown */0,
+                                  _0: $$event.which
+                                });
+                    }),
+                  onBlur: (function (_event) {
+                      return Curry._1(dispatch, /* Submit */1);
+                    }),
+                  onChange: (function ($$event) {
+                      return Curry._1(dispatch, {
+                                  TAG: /* Change */1,
+                                  _0: $$event.target.value
+                                });
+                    })
+                }));
 }
 
-exports.component = component;
-exports.setEditFieldRef = setEditFieldRef;
+var make = TodoItem;
+
 exports.make = make;
-/* component Not a pure module */
+/* react Not a pure module */

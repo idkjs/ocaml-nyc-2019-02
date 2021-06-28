@@ -1,68 +1,67 @@
 'use strict';
 
 var Curry = require("bs-platform/lib/js/curry.js");
-var Js_primitive = require("bs-platform/lib/js/js_primitive.js");
+var Caml_option = require("bs-platform/lib/js/caml_option.js");
 
 function defaultCallback() {
-  return /* Stop */[undefined];
+  return /* Stop */{
+          _0: undefined
+        };
 }
 
-function create() {
-  return /* record */[
-          /* id */undefined,
-          /* callback */defaultCallback
-        ];
+function create(param) {
+  return {
+          id: undefined,
+          callback: defaultCallback
+        };
 }
 
-function onAnimationFrame(animation, _) {
-  if (animation[/* id */0] !== undefined) {
-    var match = animation[/* callback */1]();
-    if (match) {
-      var match$1 = match[0];
-      if (match$1 !== undefined) {
-        animation[/* id */0] = undefined;
-        return Curry._1(match$1, /* () */0);
-      } else {
-        animation[/* id */0] = undefined;
-        return /* () */0;
-      }
-    } else {
-      animation[/* id */0] = Js_primitive.some(requestAnimationFrame((function (param) {
-                  return onAnimationFrame(animation, param);
-                })));
-      return /* () */0;
-    }
+function onAnimationFrame(animation, param) {
+  if (animation.id === undefined) {
+    return ;
+  }
+  var match = animation.callback();
+  if (!match) {
+    animation.id = Caml_option.some(requestAnimationFrame(function (param) {
+              return onAnimationFrame(animation, param);
+            }));
+    return ;
+  }
+  var onStop = match._0;
+  if (onStop !== undefined) {
+    animation.id = undefined;
+    return Curry._1(onStop, undefined);
   } else {
-    return 0;
+    animation.id = undefined;
+    return ;
   }
 }
 
 function start(animation) {
-  animation[/* id */0] = Js_primitive.some(requestAnimationFrame((function (param) {
-              return onAnimationFrame(animation, param);
-            })));
-  return /* () */0;
+  animation.id = Caml_option.some(requestAnimationFrame(function (param) {
+            return onAnimationFrame(animation, param);
+          }));
+  
 }
 
 function stop(animation) {
-  var match = animation[/* id */0];
-  if (match !== undefined) {
-    cancelAnimationFrame(Js_primitive.valFromOption(match));
-    animation[/* id */0] = undefined;
-    return /* () */0;
-  } else {
-    return /* () */0;
+  var id = animation.id;
+  if (id !== undefined) {
+    cancelAnimationFrame(Caml_option.valFromOption(id));
+    animation.id = undefined;
+    return ;
   }
+  
 }
 
 function setCallback(animation, callback) {
   stop(animation);
-  animation[/* callback */1] = callback;
-  return /* () */0;
+  animation.callback = callback;
+  
 }
 
 function isActive(animation) {
-  return animation[/* id */0] !== undefined;
+  return animation.id !== undefined;
 }
 
 exports.create = create;

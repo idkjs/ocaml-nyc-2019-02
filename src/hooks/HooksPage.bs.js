@@ -2,21 +2,23 @@
 
 var React = require("react");
 
-function handleClick() {
+function handleClick(_event) {
   console.log("clicked!");
-  return /* () */0;
+  
 }
 
-function make(Props) {
+function HooksPage(Props) {
   var message = Props.message;
-  React.useEffect((function () {
-          console.log("Hey!");
-          return undefined;
-        }));
+  React.useEffect(function () {
+        console.log("Hey!");
+        
+      });
   return React.createElement("button", {
               onClick: handleClick
             }, message);
 }
+
+var make = HooksPage;
 
 exports.handleClick = handleClick;
 exports.make = make;

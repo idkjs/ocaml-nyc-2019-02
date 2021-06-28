@@ -1,9 +1,9 @@
 'use strict';
 
-var ReactDOMRe = require("reason-react/src/ReactDOMRe.js");
-var ReasonReact = require("reason-react/src/ReasonReact.js");
-var HooksReanimate$ReasonReactExample = require("./HooksReanimate.bs.js");
+var React = require("react");
+var ReactDOMRe = require("reason-react/src/legacy/ReactDOMRe.bs.js");
+var HooksReanimate$Reducers = require("./HooksReanimate.bs.js");
 
-ReactDOMRe.renderToElementWithId(ReasonReact.element(undefined, undefined, HooksReanimate$ReasonReactExample.ComponentGallery[/* make */1](/* array */[])), "index");
+ReactDOMRe.renderToElementWithId(React.createElement(HooksReanimate$Reducers.ComponentGallery.make, {}), "index");
 
 /*  Not a pure module */

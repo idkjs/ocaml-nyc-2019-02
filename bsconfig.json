@@ -1,8 +1,7 @@
 {
   "name": "reason-react-example",
   "bsc-flags": ["-bs-no-version-header", "-bs-super-errors"],
-  "ppx-flags": [
-    "./ppx/reactjs_jsx_ppx_v3.exe"],
+  "reason": { "react-jsx": 3 },
   "namespace": true,
   "bs-dependencies": [
     "reason-react",
@@ -19,6 +18,6 @@
     "module": "commonjs",
     "in-source": true
   },
-  "suffix": ".bs.js",
-  "refmt": 3
+ "warnings": {"number": "-48"},
+  "suffix": ".bs.js"
 }

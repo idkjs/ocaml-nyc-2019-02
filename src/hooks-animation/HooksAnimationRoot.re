@@ -1,4 +1,4 @@
 ReactDOMRe.renderToElementWithId(
-  ReasonReact.element(HooksReanimate.ComponentGallery.make([||])),
+  <HooksReanimate.ComponentGallery/>,
   "index",
 );

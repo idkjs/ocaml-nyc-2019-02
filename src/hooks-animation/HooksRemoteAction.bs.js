@@ -1,30 +1,33 @@
 'use strict';
 
 var Curry = require("bs-platform/lib/js/curry.js");
+var Caml_obj = require("bs-platform/lib/js/caml_obj.js");
 
-function sendDefault() {
-  return /* () */0;
+function sendDefault(_action) {
+  
 }
 
-function create() {
-  return /* record */[/* send */sendDefault];
+function create(param) {
+  return {
+          send: sendDefault
+        };
 }
 
 function subscribe(send, x) {
-  if (x[/* send */0] === sendDefault) {
-    x[/* send */0] = send;
+  if (Caml_obj.caml_equal(x.send, sendDefault)) {
+    x.send = send;
     return x;
   }
   
 }
 
 function unsubscribe(x) {
-  x[/* send */0] = sendDefault;
-  return /* () */0;
+  x.send = sendDefault;
+  
 }
 
 function send(x, action) {
-  return Curry._1(x[/* send */0], action);
+  return Curry._1(x.send, action);
 }
 
 exports.create = create;

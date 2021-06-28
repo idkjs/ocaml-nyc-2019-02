@@ -10,10 +10,10 @@ type onChange = float => unit;
  */
 let setOnChange:
   (
-    ~preset: Spring.preset=?,
+    ~preset: HooksSpring.preset=?,
     ~speedup: float=?,
     ~precision: float=?,
-    ~onStop: Animation.onStop=?,
+    ~onStop: HooksAnimation.onStop=?,
     ~onChange: onChange,
     ~finalValue: float=?,
     t
